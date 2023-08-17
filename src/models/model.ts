@@ -1,44 +1,49 @@
 import { hashCode, uniqueGenerator } from '../utils.js'
 import { Methods, getParams, Method } from './model.interface.js'
-import { DatabaseSchema, DatabaseSchemaLocalStorage, TableSchema  } from './register-modal.interface.js';
+import { DatabaseSchema, DatabaseSchemaLocalStorage, TableSchema } from './register-modal.interface.js';
 import { ModelAPIRequest } from './model-manager.js';
 import { models, modelsConfig, modelsConfigLocalStorage } from './register-model.js'
 import { FieldType } from '../sql/query/interface.js';
-import  * as Fields from './field/allFields.js'
+import * as Fields from './field/allFields.js'
 import { taskHolder } from '../connection/taskHolder.js';
 import { transactionOnCommit } from '../triggers/transaction.js';
 import { ReactiveList } from '../reactive/DynamicList.js';
 
-let methods : Methods = {} = {}
+let methods: Methods = {} = {}
 
 
 // inspire by https://github.com/brianschardt/browser-orm
 export class Model {
 
 
+
+  public storeName: any = null
+
   constructor(obg?) {
     Object.assign(this, obg)
   }
+
+
 
   get(arg) {
     return Model.get(arg)
   }
 
-  getDBSchema(): DatabaseSchema  {
-    const modelName = this.constructor.name
+  getDBSchema(): DatabaseSchema {
+    const modelName = this.storeName || this.constructor.name
     return modelsConfig[modelName].DatabaseSchema
   }
 
   getModelName() {
-    return this.constructor.name
+    return this.storeName || this.constructor.name
   }
-  
+
   filter(...arg) {
     return Model.filter(arg)
   }
 
   getTableSchema(): TableSchema {
-    const modelName = this.constructor.name
+    const modelName = this.storeName || this.constructor.name
     return modelsConfig[modelName].TableSchema
   }
 
@@ -52,16 +57,16 @@ export class Model {
     const DBconfig = this.getDBSchema()
     const tableSchema = this.getTableSchema()
 
-    const fiendsName = tableSchema.fields.map((field)=> field.name)
+    const fiendsName = tableSchema.fields.map((field) => field.name)
     fiendsName.push(tableSchema.id.keyPath)
 
     const Fields = {}
-    for(let name of fiendsName) {
+    for (let name of fiendsName) {
       Fields[name] = this[name]
     }
 
-    const methods:  Method[]  = [{methodName: 'save', arguments: Fields}]
-    const queryId=uniqueGenerator()
+    const methods: Method[] = [{ methodName: 'save', arguments: Fields }]
+    const queryId = uniqueGenerator()
 
     await ModelAPIRequest.obj(DBconfig, tableSchema).save(methods, queryId)
     taskHolder.finish(queryId)
@@ -77,15 +82,15 @@ export class Model {
     const createArg = {}
     createArg[idFieldName] = this[idFieldName]
 
-    const _methods: Method[] = [{methodName: 'delete', arguments: createArg}]
+    const _methods: Method[] = [{ methodName: 'delete', arguments: createArg }]
 
-    const queryId=uniqueGenerator()
+    const queryId = uniqueGenerator()
 
     await ModelAPIRequest.obj(DBconfig, TableSchema).delete(_methods, queryId)
     taskHolder.finish(queryId)
   }
-  
-  static async  deleteAll() {
+
+  static async deleteAll() {
     const DBconfig = this.getDBSchema()
     const TableSchema = this.getTableSchema()
 
@@ -94,9 +99,9 @@ export class Model {
     const createArg = {}
     createArg[idFieldName] = this[idFieldName]
 
-    const _methods: Method[] = [{methodName: 'delete', arguments: '*'}]
+    const _methods: Method[] = [{ methodName: 'delete', arguments: '*' }]
 
-    const queryId=uniqueGenerator()
+    const queryId = uniqueGenerator()
 
     await ModelAPIRequest.obj(DBconfig, TableSchema).delete(_methods, queryId)
     taskHolder.finish(queryId)
@@ -105,9 +110,9 @@ export class Model {
   async all() {
     const DBconfig = this.getDBSchema()
     const TableSchema = this.getTableSchema()
-    const queryId=uniqueGenerator()
+    const queryId = uniqueGenerator()
 
-    const result = await Model.object({queryId, DBconfig, TableSchema}).all()
+    const result = await Model.object({ queryId, DBconfig, TableSchema }).all()
     taskHolder.finish(queryId)
     return result
   }
@@ -129,17 +134,17 @@ export class Model {
   static Value(args) {
     return ''
   }
-  
+
   static formValidation(data) {
     const TableSchema = this.getTableSchema()
 
-    for(let field of TableSchema.fields) {
+    for (let field of TableSchema.fields) {
 
       const Field = new Fields[field.className](field.fieldAttributes)
       const FieldValue = data[field.name]
 
-      if(!Field.valid(FieldValue)) {
-        throw('invalid insert into '+TableSchema.name +', invalid value for field '+ field.name+ ' = '+JSON.stringify(FieldValue))
+      if (!Field.valid(FieldValue)) {
+        throw ('invalid insert into ' + TableSchema.name + ', invalid value for field ' + field.name + ' = ' + JSON.stringify(FieldValue))
       }
     }
 
@@ -147,12 +152,12 @@ export class Model {
   }
 
   static async getModelsFields(arg) {
-    
+
     const newArgs = {}
 
     const TableSchema = this.getTableSchema()
 
-    if(TableSchema.id?.autoIncrement) {
+    if (TableSchema.id?.autoIncrement) {
       TableSchema.fields.push({
         keyPath: TableSchema.id.keyPath,
         name: TableSchema.id.keyPath,
@@ -174,58 +179,58 @@ export class Model {
     const TableSchema = this.getTableSchema()
     const queryId = uniqueGenerator()
 
-    const result = await Model.object({queryId, DBconfig, TableSchema}).all()
+    const result = await Model.object({ queryId, DBconfig, TableSchema }).all()
     taskHolder.finish(queryId)
     return result
   }
-  
+
   static async get(arg: getParams) {
-    const _methods:  Method[] = [{methodName: 'get', arguments: arg}]
+    const _methods: Method[] = [{ methodName: 'get', arguments: arg }]
     const DBconfig = this.getDBSchema()
     const TableSchema = this.getTableSchema()
-    
+
     const queryId = uniqueGenerator()
 
     const foundObj = await ModelAPIRequest.obj(DBconfig, TableSchema).get(_methods, queryId)
     taskHolder.finish(queryId)
 
-    if(!foundObj) {
+    if (!foundObj) {
       return false
     }
 
     const ModelName = this.getModelName()
-    
-    let newInstance = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: foundObj})
 
-    return  newInstance
+    let newInstance = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: foundObj })
+
+    return newInstance
   }
 
   static async getOrCreate(arg: getParams) {
     const object = await this.get(arg)
-    if(!object) {
+    if (!object) {
       return await this.create(arg)
     } else {
       return object
     }
   }
-  
+
 
   private static getId() {
     return hashCode(this.toString())
   }
 
-  static getModelName () {
+  static getModelName() {
     return this.toString().split('(' || /s+/)[0].split(' ' || /s+/)[1];
   }
 
   static filter(...arg) {
-    const queryId =  uniqueGenerator()
+    const queryId = uniqueGenerator()
     const DBconfig = this.getDBSchema()
     const TableSchema = this.getTableSchema()
 
     const newInstanceModel = this.NewModelInstance()
 
-    const result = Object.assign(newInstanceModel, this.object({queryId,DBconfig, TableSchema, some:['filter', arg]})) as any
+    const result = Object.assign(newInstanceModel, this.object({ queryId, DBconfig, TableSchema, some: ['filter', arg] })) as any
     taskHolder.finish(queryId)
     return result
   }
@@ -238,10 +243,10 @@ export class Model {
     return newInstanceModel as any
   }
 
-  static getDBSchema(): DatabaseSchema  {
+  static getDBSchema(): DatabaseSchema {
 
     const modalName = this.getModelName()
-    return modelsConfig[modalName].DatabaseSchema 
+    return modelsConfig[modalName].DatabaseSchema
   }
 
   static getTableSchema(): TableSchema {
@@ -251,13 +256,13 @@ export class Model {
   }
 
 
-  private static async getEmptyFields () {
+  private static async getEmptyFields() {
     const TableSchema = this.getTableSchema()
     const emptyFields = {}
 
-    const fieldsName = TableSchema.fields.map((field)=>field.name)
+    const fieldsName = TableSchema.fields.map((field) => field.name)
 
-    for(let fieldName of fieldsName) {
+    for (let fieldName of fieldsName) {
       emptyFields[fieldName] = null
     }
 
@@ -269,10 +274,10 @@ export class Model {
     const TableSchema = this.getTableSchema()
     const filteredArgs = {}
 
-    const fieldsName = TableSchema.fields.map((field)=>field.name)
+    const fieldsName = TableSchema.fields.map((field) => field.name)
 
-    for(let fieldName of fieldsName) {
-      if(arg.hasOwnProperty(fieldName)) {
+    for (let fieldName of fieldsName) {
+      if (arg.hasOwnProperty(fieldName)) {
         filteredArgs[fieldName] = arg[fieldName]
       }
     }
@@ -283,65 +288,65 @@ export class Model {
 
   static async create(arg): Promise<any> {
 
-    return new Promise(async (resolve, reject)=> {
+    return new Promise(async (resolve, reject) => {
 
-      if (arg.constructor.name != 'Array') {
+      if ((arg.storeName || arg.constructor.name) != 'Array') {
         arg = [arg]
       }
-  
+
       const emptyFields = await this.getEmptyFields()
       const TableSchema = this.getTableSchema()
       const ModelName = TableSchema.name
-  
-  
-      for(let i in arg) {
-        arg[i] = Object.assign({...emptyFields} , this.getFields(arg[i]))
-  
-        if(!this.formValidation(arg[i])) {
-          throw('invalid '+ JSON.stringify(arg[i]))
+
+
+      for (let i in arg) {
+        arg[i] = Object.assign({ ...emptyFields }, this.getFields(arg[i]))
+
+        if (!this.formValidation(arg[i])) {
+          throw ('invalid ' + JSON.stringify(arg[i]))
         }
-  
+
       }
-  
-      for(let i in arg) {
-  
+
+      for (let i in arg) {
+
         if (TableSchema.attributes.foreignKey) {
           for (let field of TableSchema.attributes.foreignKey) {
             try {
               arg[i][field] = arg[i][field].getPrimaryKeyValue()
-            } catch (error){}
-            
+            } catch (error) { }
+
           }
         }
-  
+
       }
-  
-      const _methods: Method[] = [{methodName: 'create', arguments: arg}]
+
+      const _methods: Method[] = [{ methodName: 'create', arguments: arg }]
       const DBconfig = this.getDBSchema()
-  
+
       const queryId = uniqueGenerator()
-      
+
       const result = []
-      await ModelAPIRequest.obj(DBconfig, TableSchema).create(_methods, queryId, ({id, index}) => {
+      await ModelAPIRequest.obj(DBconfig, TableSchema).create(_methods, queryId, ({ id, index }) => {
         const insert = arg[index]
         insert[TableSchema.id.keyPath] = id
-        const instance = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: insert})
+        const instance = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: insert })
         result.push(instance)
       })
 
       taskHolder.updateFunction(queryId, "done", () => {
-        
- 
-        if(arg.length == 1) {
+
+
+        if (arg.length == 1) {
           resolve(result[0])
         } else {
           resolve(result)
         }
         taskHolder.finish(queryId)
       })
-  
+
     });
-    
+
 
   }
 
@@ -350,25 +355,25 @@ export class Model {
 
     delete newInstance[TableSchema.id.keyPath]
 
-    if(TableSchema.fieldTypes.ManyToManyField) {
+    if (TableSchema.fieldTypes.ManyToManyField) {
       for (let field of TableSchema.fieldTypes.ManyToManyField) {
         newInstance[field] = null
-        
+
       }
     }
 
-    if(TableSchema.fieldTypes.OneToOneField) {
+    if (TableSchema.fieldTypes.OneToOneField) {
       for (let field of TableSchema.fieldTypes.ManyToManyField) {
-        newInstance[field] = null 
+        newInstance[field] = null
       }
     }
     Object.assign(newInstance, dataToMerge);
 
-    if(newInstance[TableSchema.id.keyPath]) {
-      Object.defineProperty(newInstance, TableSchema.id.keyPath, 
-        { 
-          configurable: false, 
-          writable: false 
+    if (newInstance[TableSchema.id.keyPath]) {
+      Object.defineProperty(newInstance, TableSchema.id.keyPath,
+        {
+          configurable: false,
+          writable: false
         }
       );
     }
@@ -378,7 +383,7 @@ export class Model {
 
 
   static async createOrFind(getArg, defaultCreate) {
-    
+
     const result: any[] = await this.filter(getArg).execute()
     const TableSchema = this.getTableSchema()
     const DBconfig = this.getDBSchema()
@@ -386,10 +391,10 @@ export class Model {
 
     let instance;
     let created;
-    
-    if(result.length == 1) {
+
+    if (result.length == 1) {
       created = false
-      instance =  await this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: result[0] })
+      instance = await this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: result[0] })
     } else {
       created = true
       instance = await this.create(Object.assign(getArg, defaultCreate))
@@ -399,10 +404,10 @@ export class Model {
   }
 
   static async updateOrCreate(argToFind, argsToUpdate) {
-    
-    let [instance , created] = await this.createOrFind(argToFind, argsToUpdate)
 
-    if(!created) {
+    let [instance, created] = await this.createOrFind(argToFind, argsToUpdate)
+
+    if (!created) {
       const params = Object.assign(argToFind, argsToUpdate)
       instance = Object.assign(instance, params)
 
@@ -414,14 +419,14 @@ export class Model {
 
 
   static async update(arg) {
-    
+
     arg = this.getFields(arg)
 
     const DBconfig = this.getDBSchema()
     const TableSchema = this.getTableSchema()
-    const _methods: Method[] = [{methodName: 'update', arguments: arg}]
+    const _methods: Method[] = [{ methodName: 'update', arguments: arg }]
     const queryId = uniqueGenerator()
-    
+
 
     const result = await ModelAPIRequest.obj(DBconfig, TableSchema).update(_methods, queryId)
     taskHolder.finish(queryId)
@@ -429,72 +434,72 @@ export class Model {
   }
 
 
-  static transactionOnCommit (callback : () => void) {
+  static transactionOnCommit(callback: () => void) {
     return transactionOnCommit.subscribe(this as unknown as Model, callback)
   }
 
-  static ReactiveList (callback : (Model: Model) => void) {
+  static ReactiveList(callback: (Model: Model) => void) {
     return ReactiveList.subscribe(this as unknown as Model, callback)
   }
 
-  static object = ({queryId, DBconfig, TableSchema,  some = null}) => {
+  static object = ({ queryId, DBconfig, TableSchema, some = null }) => {
 
     const ModelName = TableSchema.name
 
-    if(!methods[queryId]) {
+    if (!methods[queryId]) {
       methods[queryId] = []
     }
 
-    if(some) {
+    if (some) {
       const methodName = some[0]
       const methodArgs = some[1]
-      this.object({queryId,DBconfig, TableSchema})[methodName](...methodArgs)
+      this.object({ queryId, DBconfig, TableSchema })[methodName](...methodArgs)
     }
 
     return {
       filter: (...args) => {
-        methods[queryId].push({methodName: 'filter', arguments: args})
+        methods[queryId].push({ methodName: 'filter', arguments: args })
         const newInstanceModel = this.NewModelInstance()
-        return Object.assign(newInstanceModel, this.object({DBconfig, TableSchema,queryId}))
+        return Object.assign(newInstanceModel, this.object({ DBconfig, TableSchema, queryId }))
       },
       execute: async (): Promise<any[]> => {
-        return new Promise(async(resolve, reject) => {
-          methods[queryId].push({methodName: 'execute', arguments: null})
+        return new Promise(async (resolve, reject) => {
+          methods[queryId].push({ methodName: 'execute', arguments: null })
 
           const _methods: Method[] = methods[queryId]
           methods[queryId] = []
           const result = await ModelAPIRequest.obj(DBconfig, TableSchema).execute(_methods, queryId)
           resolve(result);
 
-          for(let i of result) {
-            result[i] = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: result[i]})
+          for (let i of result) {
+            result[i] = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: result[i] })
           }
         })
-        
-      }, 
-      update: async(args) => {
-        methods[queryId].push({methodName: 'update', arguments: args})
+
+      },
+      update: async (args) => {
+        methods[queryId].push({ methodName: 'update', arguments: args })
         const _methods: Method[] = methods[queryId]
         methods[queryId] = []
-        return  await ModelAPIRequest.obj(DBconfig, TableSchema).update(_methods, queryId)
+        return await ModelAPIRequest.obj(DBconfig, TableSchema).update(_methods, queryId)
       },
-      delete: async() => {
-        methods[queryId].push({methodName: 'delete', arguments: null})
+      delete: async () => {
+        methods[queryId].push({ methodName: 'delete', arguments: null })
         const _methods: Method[] = methods[queryId]
         methods[queryId] = []
         return await ModelAPIRequest.obj(DBconfig, TableSchema).delete(_methods, queryId)
 
       },
-      all: async(): Promise<any[]> => {
-        return new Promise(async(resolve, reject) => {
-          methods[queryId].push({methodName: 'all', arguments: null})
+      all: async (): Promise<any[]> => {
+        return new Promise(async (resolve, reject) => {
+          methods[queryId].push({ methodName: 'all', arguments: null })
           const _methods: Method[] = methods[queryId]
           methods[queryId] = []
           const result = await ModelAPIRequest.obj(DBconfig, TableSchema).all(_methods, queryId)
 
           resolve(result);
-          for(let i of result) {
-            result[i] = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: result[i]})
+          for (let i of result) {
+            result[i] = this.newInstance({ TableSchema, DBconfig, ModelName, dataToMerge: result[i] })
           }
         });
       }
@@ -505,10 +510,10 @@ export class Model {
 
 export class LocalStorage {
 
-  constructor() {}
+  constructor() { }
 
   static save(data: Object = {}) {
-    const dataToSave = this.getFields(Object.assign(this, {...data}))
+    const dataToSave = this.getFields(Object.assign(this, { ...data }))
     const key = this.getTableSchema().id
     localStorage.setItem(key.keyPath, JSON.stringify(dataToSave))
   }
@@ -516,7 +521,7 @@ export class LocalStorage {
   static get() {
     const key = this.getTableSchema().id
     const restedData = JSON.parse(localStorage.getItem(key.keyPath))
-    Object.assign(this, {...restedData})
+    Object.assign(this, { ...restedData })
 
     return restedData
   }
@@ -525,9 +530,9 @@ export class LocalStorage {
     return this.toString().split('(' || /s+/)[0].split(' ' || /s+/)[1];
   }
 
-  static getDBSchema(): DatabaseSchemaLocalStorage  {
+  static getDBSchema(): DatabaseSchemaLocalStorage {
     const modalName = this.getModelName()
-    return modelsConfigLocalStorage[modalName].DatabaseSchema 
+    return modelsConfigLocalStorage[modalName].DatabaseSchema
   }
 
   static getTableSchema(): TableSchema {
@@ -540,7 +545,7 @@ export class LocalStorage {
   }
 
   static ignoreAttributes(attributesStartWidth: string[] = []) {
-    if(!this.getIgnoreAttributes()) {
+    if (!this.getIgnoreAttributes()) {
       this.getIgnoreAttributes = (): any => {
         return attributesStartWidth
       }
@@ -552,24 +557,24 @@ export class LocalStorage {
     const TableSchema = this.getTableSchema()
     const filteredArgs = {}
 
-    const fieldsName = TableSchema.fields.map((field)=>field.name)
+    const fieldsName = TableSchema.fields.map((field) => field.name)
     const Attributes = this.getIgnoreAttributes()
-    
+
     const fieldNameFilter = fieldsName.filter((fieldName) => {
-      
-      if(Attributes) {
-        for(let Attribute of Attributes) {
-          if(fieldName.startsWith(Attribute)) {
+
+      if (Attributes) {
+        for (let Attribute of Attributes) {
+          if (fieldName.startsWith(Attribute)) {
             return false
           }
         }
       }
-      
+
       return true
     })
 
-    for(let fieldName of fieldNameFilter) {
-      if(arg.hasOwnProperty(fieldName)) {
+    for (let fieldName of fieldNameFilter) {
+      if (arg.hasOwnProperty(fieldName)) {
         filteredArgs[fieldName] = arg[fieldName]
       }
     }
@@ -580,13 +585,13 @@ export class LocalStorage {
   private static formValidation(data) {
     const TableSchema = this.getTableSchema()
 
-    for(let field of TableSchema.fields) {
+    for (let field of TableSchema.fields) {
 
       const Field = new Fields[field.className](field.fieldAttributes)
       const FieldValue = data[field.name]
 
-      if(!Field.valid(FieldValue)) {
-        throw('invalid insert into '+TableSchema.name +', invalid value for field '+ field.name+ ' = '+JSON.stringify(FieldValue))
+      if (!Field.valid(FieldValue)) {
+        throw ('invalid insert into ' + TableSchema.name + ', invalid value for field ' + field.name + ' = ' + JSON.stringify(FieldValue))
       }
     }
 

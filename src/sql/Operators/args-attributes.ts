@@ -13,7 +13,7 @@ export interface Field {
     customData?: Function
 }
 
-export interface value  {
+export interface value {
     fieldName: string,
     fieldPath: string,
     operation: any,
@@ -25,23 +25,23 @@ export interface value  {
 
 export class argsAttributes {
 
-    value: Array<FieldsMap<string, Field>>  = []
+    value: Array<FieldsMap<string, Field>> = []
     schemeFields: AttributesMap<string, FieldSchema> = {} = {}
 
-    constructor(args, private TableSchema:TableSchema) {
+    constructor(args, private TableSchema: TableSchema) {
 
-        for( const field of this.TableSchema.fields) {
-			this.schemeFields[field.name] = field
-		}
+        for (const field of this.TableSchema.fields) {
+            this.schemeFields[field.name] = field
+        }
 
-		this.schemeFields[this.TableSchema.id.keyPath] = {
-			keyPath: this.TableSchema.id.keyPath,
-			name: this.TableSchema.id.keyPath,
-			className: 'IntegerField',
-		}
+        this.schemeFields[this.TableSchema.id.keyPath] = {
+            keyPath: this.TableSchema.id.keyPath,
+            name: this.TableSchema.id.keyPath,
+            className: 'IntegerField',
+        }
 
-        if(args.constructor.name != 'Array') {
-            args = [ args ]
+        if (args.constructor.name != 'Array') {
+            args = [args]
         }
 
         const conditions = this.argsPrettyTransform(args)
@@ -52,38 +52,38 @@ export class argsAttributes {
 
     private analyzeArgs(conditions: any[]): Array<FieldsMap<string, Field>> {
 
-        return conditions.map((condition:object) => {
+        return conditions.map((condition: object) => {
 
             const newObject: AttributesMap<FieldAttributesKeys, string[]> = {}
 
             const keys = Object.keys(condition)
-            for(let field of keys) {
+            for (let field of keys) {
                 let fieldName;
                 let fieldPath;
                 let arg;
 
                 const element = field.split('__')
-                
-                if(element.length == 1) {
+
+                if (element.length == 1) {
                     element.push('eq')
                 }
 
-                let  operation: any = element[element.length - 1]
+                let operation: any = element[element.length - 1]
 
-            
-                if(OperatorsKeysArray.includes(operation)) {
+
+                if (OperatorsKeysArray.includes(operation)) {
                     operation = element.pop()
                 } else {
                     operation = 'eq'
                 }
-                
+
                 fieldName = element[0]
                 fieldPath = element.join('.')
 
-                if(OperatorsKeysArray.includes(operation)) {
+                if (OperatorsKeysArray.includes(operation)) {
                     arg = condition[field];
                 } else {
-                    throw('operator')
+                    throw ('operator')
                 }
 
                 const fieldClassName = this.detectClassName(fieldName)
@@ -97,12 +97,12 @@ export class argsAttributes {
                     fieldClassName: fieldClassName,
                 }
 
-                if(fieldClassName == 'indexedDBArrayField' || fieldClassName == 'indexedDBJsonField') {
-                    newObject[field]['customData']  = info.run
+                if (fieldClassName == 'indexedDBArrayField' || fieldClassName == 'indexedDBJsonField') {
+                    newObject[field]['customData'] = info.run
                 } else {
-                    newObject[field]['customData']  = () => {}
+                    newObject[field]['customData'] = () => { }
                 }
-                
+
             }
 
             return newObject
@@ -116,47 +116,47 @@ export class argsAttributes {
 
     private detectOperator(fieldClassName, operation, fieldName) {
         try {
-            if(fieldClassName == 'indexedDBJsonField') {
+            if (fieldClassName == 'indexedDBJsonField') {
                 return ObjOperatorOverwrite[operation]
-            } 
-            else if(fieldClassName == 'indexedDBArrayField') {
-                return ArrOperatorOverwrite[operation]	
-            } 
+            }
+            else if (fieldClassName == 'indexedDBArrayField') {
+                return ArrOperatorOverwrite[operation]
+            }
             else {
                 return operator[operation]
             }
         } catch (err) {
-            throw('Field '+ fieldName +' does not exit on the table'+ err)
+            throw ('Field ' + fieldName + ' does not exit on the table' + err)
         }
     }
 
     private argsPrettyTransform(args) {
         const conditions = []
 
-        const loop =  (o) => {
+        const loop = (o) => {
             // https://stackoverflow.com/a/38597076/14115342
             const condition: any = {}
 
-            for( const k of Object.keys(o)) {
-                if ( o[k].constructor.name === 'Array') {
+            for (const k of Object.keys(o)) {
+                if ((o[k].storeName || o[k].constructor.name) === 'Array') {
                     loop(o[k]);
                 } else {
-                    if ( o.constructor.name === 'Array') {
-                        for( const j of Object.keys(o[k])) {
+                    if ((o.storeName || o.constructor.name) === 'Array') {
+                        for (const j of Object.keys(o[k])) {
                             condition[j] = o[k][j]
                         }
-                        
+
                     } else {
                         condition[k] = o[k]
                     }
-                    
+
                 }
             }
 
-            if(JSON.stringify(condition) !== '{}') {
+            if (JSON.stringify(condition) !== '{}') {
                 conditions.push(condition)
             }
-            
+
         }
         loop(args)
 

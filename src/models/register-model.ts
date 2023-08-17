@@ -358,7 +358,7 @@ export class ModelEditor {
     const middleTable = await registerModel.manyToManyRelationShip(foreignKeyField, FieldName, modelName, databaseSchema)
 
     currentModel['prototype'][FieldName+'_add'] = async function (modelInstances) {
-      if(modelInstances.constructor.name != 'Array') {
+      if((modelInstances.storeName || modelInstances.constructor.name) != 'Array') {
         modelInstances = [modelInstances]
       }
 
